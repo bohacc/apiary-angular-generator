@@ -1,13 +1,13 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "outDir": "./dist/out-tsc",
     "sourceMap": true,
-    "declaration": false,
+    "declaration": true,
     "moduleResolution": "node",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "target": "es5",
+    "target": "es2017",
+    "module": "commonjs",
     "typeRoots": [
       "node_modules/@types",
       "node_modules/drafter.js"
@@ -16,5 +16,8 @@
       "es2017",
       "dom"
     ]
-  }
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
 }

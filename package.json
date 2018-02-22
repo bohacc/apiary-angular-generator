@@ -7,9 +7,13 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build --prod",
+    "build-x": "tsc --outDir dist",
     "test": "ng test",
     "lint": "ng lint",
-    "e2e": "ng e2e"
+    "e2e": "ng e2e",
+    "apiary-generate": "npm run gen",
+    "test-generate": "ts-node test-generate",
+    "generate": "apiary-angular-generator"
   },
   "private": true,
   "dependencies": {
@@ -22,7 +26,10 @@
     "@angular/platform-browser": "^5.2.5",
     "@angular/platform-browser-dynamic": "^5.2.5",
     "@angular/router": "^5.2.5",
+    "@types/fs-extra": "^5.0.0",
     "core-js": "^2.4.1",
+    "drafter.js": "^2.6.7",
+    "fs-extra": "^5.0.0",
     "python2": "0.0.1",
     "rxjs": "^5.5.6",
     "zone.js": "^0.8.19"
