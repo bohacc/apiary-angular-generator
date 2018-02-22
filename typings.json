@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "drafter": "file:node_modules/drafter.js/drafter.d.ts"
+  }
+}
