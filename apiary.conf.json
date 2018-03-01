@@ -1,0 +1,10 @@
+{
+  "outDir": {
+    "path": "api",
+    "types": "api/dto",
+    "services": "api/services"
+  },
+  "fileName": {
+    "sufix": "-api.service.ts"
+  }
+}
