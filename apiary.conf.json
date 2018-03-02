@@ -1,10 +1,19 @@
 {
   "outDir": {
     "path": "api",
-    "types": "api/dto",
-    "services": "api/services"
+    "dirNameTypes": "dto",
+    "dirNameServices": "services"
   },
   "fileName": {
     "sufix": "-api.service.ts"
-  }
+  },
+  "method": {
+    "addMethodTypeToPrefixName": false
+  },
+  "imports": [
+    "import { HttpUtils } from '../utils/http-utils;'"
+  ],
+  "endOfMethod": [
+    ".catch(HttpUtils.handleHttpError);"
+  ]
 }

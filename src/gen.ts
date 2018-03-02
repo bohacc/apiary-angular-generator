@@ -1,11 +1,16 @@
 import * as fs from 'fs-extra';
 const drafter = require('drafter.js');
+const camelCase = require('camelcase');
+const decamelize = require('decamelize');
 
 const RESOURCE_GROUP = 'resourceGroup';
 const RESOURCE = 'resource';
+const TRANSITION = 'transition';
 const CATEGORY = 'category';
 const META = 'meta';
+const HTTPREQUEST = 'httpRequest';
 const CLASSES = 'classes';
+const SEMICOLON = ';';
 
 export function gen() {
   const file = fs.readFileSync('./schema/apiary.txt', 'utf8');
@@ -50,9 +55,15 @@ function recurse(content: any, nodes: Node[], meta: string, result: Result) {
 function getResourceGroup(content) {
   const result: Result = {values: []};
   const config: Config = JSON.parse(String(fs.readFileSync('apiary.conf.json')));
+  const URL_PROP_NAME_PREFIX = 'URL_';
+  const FILE_EXT = '.ts';
+  const EOF = '\n';
+  const TAB3 = '      ';
+  const REQUEST_TYPE_SUFIX = 'Request';
+
   fs.mkdirpSync(config.outDir.path);
-  fs.mkdirpSync(config.outDir.services);
-  fs.mkdirpSync(config.outDir.types);
+  fs.mkdirpSync(config.outDir.path + '/' + config.outDir.dirNameServices);
+  fs.mkdirpSync(config.outDir.path + '/' + config.outDir.dirNameTypes);
 
   recurse(content, [{name: 'element', value: CATEGORY}], RESOURCE_GROUP, result);
   console.log(result);
@@ -67,63 +78,89 @@ function getResourceGroup(content) {
     let methods = '';
     let classImports = '';
     let urlConsts = '';
-    const groupName = (getTitle(item).replace(/ /g, '-'));
+    const groupName = camelCase(getTitle(item));
+    const serviceFileName = decamelize(groupName + config.fileName.sufix, '-');
+
+    // DIR
+    fs.mkdirpSync(config.outDir.path + '/' + config.outDir.dirNameTypes + '/' + decamelize(groupName, '-'));
 
     console.log('*******************');
     console.log(getTitle(item));
     console.log('*******************');
+    // console.log(JSON.stringify(item));
 
-    recurse(item, [{name: 'element', value: RESOURCE}], null, result2);
+    recurse(item, [{name: 'element', value: TRANSITION}], null, result2);
     result2.values.forEach((item2) => {
 
-      console.log(JSON.stringify(item2));
+      // console.log(JSON.stringify(item2));
 
-      // const unitName = getFileName(getTitle(item2)).replace(/ /g, '-');
-      const unitName = camelize(getFileName(getTitle(item2)));
-      const url = getHref(item2);
-      const unitNameFirstUpper = (unitName.split('').map((char, i) => i === 0 ? char.toUpperCase() : char).join(''));
-
-      // DIR
-      fs.mkdirpSync(config.outDir.types + '/' + groupName.toLowerCase());
+      const unitName: string = camelCase(getTitle(item2));
+      const unitNameRequest: string = camelCase(getTitle(item2) + REQUEST_TYPE_SUFIX);
+      const url: string = getHref(item2);
+      const unitNameFirstUpper: string = firstUp(unitName);
+      const unitNameRequestFirstUpper: string = firstUp(unitNameRequest);
+      const contentType = '';
+      const typeFileName = decamelize(unitName, '-');
+      const typeRequestFileName = decamelize(unitNameRequest, '-');
+      const endOfMethod = config.endOfMethod ? config.endOfMethod.join(EOF + TAB3) : null;
+      const methodType = getHttpMethod(item2);
 
       // IMPORTS
       classImports += templateClassImport
-        .replace(/@@METHOD_NAME@@/g, unitNameFirstUpper)
-        .replace(/@@DIR_NAME@@/g, unitName.toLowerCase())
-        .replace(/@@FILE_NAME@@/g, unitName);
+        .replace(/@@METHOD_NAME_FIRST_UP@@/g, unitNameFirstUpper)
+        .replace(/@@DIR_NAME@@/g, decamelize(groupName, '-'))
+        .replace(/@@TYPES_DIR_NAME@@/g, config.outDir.dirNameTypes)
+        .replace(/@@FILE_NAME@@/g, typeFileName);
 
-      // GET
-      methods += '\n' + templateHttpMethod
+      // IMPORTS REQUEST FILE
+      classImports += templateClassImport
+        .replace(/@@METHOD_NAME_FIRST_UP@@/g, unitNameRequestFirstUpper)
+        .replace(/@@DIR_NAME@@/g, decamelize(groupName, '-'))
+        .replace(/@@TYPES_DIR_NAME@@/g, config.outDir.dirNameTypes)
+        .replace(/@@FILE_NAME@@/g, typeRequestFileName);
+
+      // METHODS
+      methods += EOF + templateHttpMethod
         .replace(/@@METHOD_NAME@@/g, unitNameFirstUpper)
-        .replace(/@@URL_PROP_NAME@@/g, 'URL_' + unitName.toUpperCase())
-        .replace(/@@METHOD_TYPE@@/g, 'get')
-        .replace(/@@METHOD_TYPE_UPPER@@/g, 'Get');
+        .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + unitName.toUpperCase())
+        .replace(/@@METHOD_TYPE@@/g, methodType)
+        .replace(/@@END_OF_METHOD@@/g, EOF + TAB3 + endOfMethod || SEMICOLON)
+        .replace(/@@METHOD_NAME_FIRST_UP@@/g, firstUp(unitName))
+        .replace(/@@HTTP_METHOD@@/g, methodType.toLowerCase())
+        .replace(/@@REQUEST_TYPE_SUFIX@@/g, REQUEST_TYPE_SUFIX)
+        .replace(/@@HTTP_METHOD_PREFIX@@/g, config.method.addMethodTypeToPrefixName ? firstUp(methodType) : '');
 
       urlConsts += templateUrlConsts
-        .replace(/@@URL_PROP_NAME@@/g, 'URL_' + unitName.toUpperCase())
+        .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + unitName.toUpperCase())
         .replace(/@@URL@@/g, url);
 
-      // POST
-
-      // PUT
-
-      // DELETE
+      // CREATE TYPE
+      fs.writeFileSync( config.outDir.path + '/' + config.outDir.dirNameTypes + '/' + decamelize(groupName, '-') + '/' +
+        typeFileName + FILE_EXT, contentType, 'utf8');
+      fs.writeFileSync( config.outDir.path + '/' + config.outDir.dirNameTypes + '/' + decamelize(groupName, '-') + '/' +
+        typeFileName + REQUEST_TYPE_SUFIX + FILE_EXT, contentType, 'utf8');
 
       console.log(groupName);
       console.log(getHref(item2));
     });
 
+    // IMPORTS
+    if (config.imports.length > 0) {
+      config.imports.forEach((imp) => {
+        classImports += imp;
+      });
+    }
+
     contentService +=
       templateService
         .replace(/@@HTTP_METHOD@@/g, methods)
-        .replace(/@@CLASS_NAME@@/g, groupName)
+        .replace(/@@CLASS_NAME@@/g, firstUp(groupName))
         .replace(/@@URL_CONSTS@@/g, urlConsts)
         .replace(/@@IMPORTS@@/g, classImports)
-      + '\n';
+      + EOF;
 
     // CREATE SERVICE
-    fs.writeFileSync( config.outDir.services + '/' +
-      groupName.toLowerCase() + config.fileName.sufix, contentService, 'utf8');
+    fs.writeFileSync( config.outDir.path + '/' + config.outDir.dirNameServices + '/' + serviceFileName, contentService, 'utf8');
 
     console.log('/////////////////////////');
   });
@@ -153,12 +190,19 @@ function getFileName(str: string): string {
   return str.toLowerCase().replace(/ /g, '-');
 }
 
-function camelize(str) {
-  return str.replace(/(?:^\w|[A-Z]|\b\w|\s+)/g, function(match, index) {
-    if (+match === 0) { return ''; } // or if (/\s+/.test(match)) for white spaces
-    return index === 0 ? match.toLowerCase() : match.toUpperCase();
-  });
+function firstUp(value: string): string {
+  return (value.split('').map((char, i) => i === 0 ? char.toUpperCase() : char).join(''));
 }
+
+function getHttpMethod(node: any): string {
+  const resultHttpRequest: Result = {values: []};
+  recurse(node, [{name: 'element', value: HTTPREQUEST}], null, resultHttpRequest);
+  console.log(JSON.stringify(resultHttpRequest.values[0]));
+  return resultHttpRequest.values[0] &&
+    resultHttpRequest.values[0].attributes &&
+    resultHttpRequest.values[0].attributes.method ? resultHttpRequest.values[0].attributes.method.content : '';
+}
+
 
 interface Node {
   name: string;
@@ -172,10 +216,15 @@ interface Result {
 interface Config {
   outDir: {
     path: string,
-    services: string,
-    types: string
+    dirNameServices: string,
+    dirNameTypes: string
   };
   fileName: {
     sufix: string
   };
+  method: {
+    addMethodTypeToPrefixName: boolean
+  };
+  imports: string[];
+  endOfMethod: string[];
 }
