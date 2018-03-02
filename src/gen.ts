@@ -122,7 +122,7 @@ function getResourceGroup(content) {
       // METHODS
       methods += EOF + templateHttpMethod
         .replace(/@@METHOD_NAME@@/g, unitNameFirstUpper)
-        .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + unitName.toUpperCase())
+        .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + decamelize(unitName).toUpperCase())
         .replace(/@@METHOD_TYPE@@/g, methodType)
         .replace(/@@END_OF_METHOD@@/g, EOF + TAB3 + endOfMethod || SEMICOLON)
         .replace(/@@METHOD_NAME_FIRST_UP@@/g, firstUp(unitName))
@@ -131,7 +131,7 @@ function getResourceGroup(content) {
         .replace(/@@HTTP_METHOD_PREFIX@@/g, config.method.addMethodTypeToPrefixName ? firstUp(methodType) : '');
 
       urlConsts += templateUrlConsts
-        .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + unitName.toUpperCase())
+        .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + decamelize(unitName).toUpperCase())
         .replace(/@@URL@@/g, url);
 
       // CREATE TYPE
