@@ -11,5 +11,5 @@ export class @@CLASS_NAME@@Service {
   constructor(private httpClient: HttpClient) {
   }
 
-  @@HTTP_METHOD@@
+@@HTTP_METHOD@@
 }
