@@ -8,10 +8,19 @@ https://enterprise-integrations.apiary.io/api-projects/5988516e662b74070026fbde/
 
 ```
 add conf file to root dir apiary.conf.json:
-{
+interface Config {
   outDir: {
-    services: string, // path
-    types: string // path
-  }
+    path: string,
+    dirNameServices: string,
+    dirNameTypes: string
+  };
+  fileName: {
+    sufix: string
+  };
+  method: {
+    addMethodTypeToPrefixName: boolean
+  };
+  imports: string[];
+  endOfMethod: string[];
 }
 ```

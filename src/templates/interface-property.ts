@@ -1,1 +1,1 @@
-  @@KEY@@: @@VALUE@@;
+@@KEY@@@@REQUIRED@@: @@VALUE@@;
