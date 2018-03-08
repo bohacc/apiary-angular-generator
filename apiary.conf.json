@@ -15,5 +15,6 @@
   ],
   "endOfMethod": [
     ".catch(HttpUtils.handleHttpError);"
-  ]
+  ],
+  "generateParamIfNoExistTypeDeclaration": false
 }

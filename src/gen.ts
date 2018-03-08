@@ -72,6 +72,7 @@ function recurse(content: any, nodes: Node[], meta: string, result: Result) {
 function getResourceGroup(content) {
   const result: Result = {values: []};
   const config: Config = JSON.parse(String(fs.readFileSync('apiary.conf.json')));
+  // TODO: set default config
 
   fs.mkdirpSync(config.outDir.path);
   fs.mkdirpSync(config.outDir.path + '/' + config.outDir.dirNameServices);
@@ -115,7 +116,8 @@ function getResourceGroup(content) {
 
         const unitName: string = camelCase(getTitle(node));
         const unitNameRequest: string = camelCase(getTitle(node) + REQUEST_TYPE_SUFIX);
-        // console.log(JSON.stringify(subGroup));
+        console.log(unitName);
+
         const url = getHref(node) || getHref(subGroup);
         const urlWithoutQueryParams: string = prepareHref(url);
         const unitNameFirstUpper: string = firstUp(unitName);
@@ -126,8 +128,9 @@ function getResourceGroup(content) {
         const methodType = getHttpMethod(node);
         const hrefVariables: Param[] = getHrefVariables(node);
         const bodyVariables: Param[] = getBodyVariables(node);
-        const urlParams: string[] = getParamsFromUrl(url);
-        const urlQueryParams: string[] = getQueryParamsFromUrl(url);
+        const urlParams: Param[] = getParamsFromUrl(url, hrefVariables);
+        const urlQueryParams: Param[] = getQueryParamsFromUrl(url, hrefVariables, config);
+
         const secondParam = getHttpMethodSecondParam(methodType, urlQueryParams, bodyVariables);
         const thirdParam = getHttpMethodThirdParam(methodType, urlQueryParams, bodyVariables);
         let convertQueryParams = '';
@@ -155,8 +158,8 @@ function getResourceGroup(content) {
           urlParams.forEach((param) => {
             replaceParams += EOF + TAB6 + templateParamsReplace
               .replace(/\r?\n|\r/g, '')
-              .replace(/@@PARAM@@/g, param)
-              .replace(/@@VALUE@@/g, param);
+              .replace(/@@PARAM@@/g, param.name)
+              .replace(/@@VALUE@@/g, param.name);
           });
         }
 
@@ -277,7 +280,7 @@ function getPropertyRequired(node: any): boolean {
   return node && node.attributes && node.attributes.typeAttributes && node.attributes.typeAttributes.indexOf(REQUIRED) > -1;
 }
 
-function getMethodParams(unitName, node: any, params: string[], queryParams: string[],
+function getMethodParams(unitName, node: any, params: Param[], queryParams: Param[],
                          hrefVariables: Param[], bodyVariables: Param[]): string {
   const templateMethodParams: string = String(fs.readFileSync('src/templates/http-method-params.ts'));
   const templateMethodRequest: string = String(fs.readFileSync('src/templates/http-method-request.ts'));
@@ -288,8 +291,7 @@ function getMethodParams(unitName, node: any, params: string[], queryParams: str
 
   // PARAMS
   if (params && params.length > 0) {
-    paramsString = params.map((el, i) => {
-      const param: Param = getParam(el, hrefVariables);
+    paramsString = params.map((param, i) => {
       if (param) {
         return (i === 0 ? '' : ',') + param.name + ': ' + param.type;
       } else {
@@ -366,7 +368,7 @@ function createTypeRequest(config: Config, unitName: string, groupName: string, 
   const templateInterfaceProperty: string = String(fs.readFileSync('src/templates/interface-property.ts'));
   const templateInterface: string = String(fs.readFileSync('src/templates/interface.ts'));
   const typeFileNameRequest = decamelize(unitName + REQUEST_TYPE_SUFIX, '-') + FILE_EXT;
-  const paramsFromUrl: string[] = getQueryParamsFromUrl(url);
+  const paramsFromUrl: Param[] = getQueryParamsFromUrl(url, hrefVariables, config);
   let contentTypeRequest: string;
   let properties = '';
 
@@ -375,7 +377,7 @@ function createTypeRequest(config: Config, unitName: string, groupName: string, 
       if (properties) {
         properties += EOF + TAB2;
       }
-      if (paramsFromUrl.indexOf(param.name) > -1) {
+      if (paramsFromUrl.filter(item => item.name === param.name).length > 0) {
         properties += templateInterfaceProperty
           .replace(EOF, '')
           .replace(/@@KEY@@/g, param.name)
@@ -431,25 +433,43 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
   }
 }
 
-function getQueryParamsFromUrl(url: string): string[] {
+function getQueryParamsFromUrl(url: string, variables: Param[], config: Config): Param[] {
   const posPrefix = url.indexOf(URL_QUERY_PARAMS_PREFIX);
-  let params: string[];
+  let params: string[] = [];
+  const paramsType: Param[] = [];
   if (posPrefix > -1) {
     const fragment = url.substr(posPrefix + URL_QUERY_PARAMS_PREFIX.length);
     const posSufix = fragment.indexOf(URL_PARAMS_SUFIX);
     params = fragment.substr(0, posSufix)
       .split(',');
   }
-  return params || [];
+  params.forEach(item => {
+    const find: Param = variables.filter(variable => variable.name === item)[0];
+    if (find || config.generateParamIfNoExistTypeDeclaration) {
+      paramsType.push({
+        name: item,
+        type: find ? find.type : TypesEnum.ANY,
+        required: find ? find.required : false
+      });
+    }
+  });
+
+  return paramsType || [];
 }
 
-function getParamsFromUrl(url: string): string[] {
+function getParamsFromUrl(url: string, variables: Param[]): Param[] {
   const posPrefix: number = url.indexOf(URL_QUERY_PARAMS_PREFIX);
   const fragment: string = posPrefix > -1 ? url.substr(0, posPrefix) : url;
-  const params: string[] = [];
+  const params: Param[] = [];
   (fragment ? fragment.split(URL_PARAMS_PREFIX) : []).forEach((item) => {
     if (item.indexOf(URL_PARAMS_SUFIX) > -1) {
-      params.push(item.split(URL_PARAMS_SUFIX)[0]);
+      const propertyName = item.split(URL_PARAMS_SUFIX)[0];
+      const prop: Param = variables.filter((variable) => variable.name === propertyName)[0];
+      params.push({
+        name: propertyName,
+        type: prop ? prop.type : TypesEnum.ANY,
+        required: prop ? prop.required : false
+      });
     }
   });
   return params;
@@ -459,8 +479,9 @@ function getParam(key: string, params: Param[]): Param {
   return params.filter((param) => param.name === key)[0];
 }
 
-function getHttpMethodSecondParam(methodType: string, queryParams: string[], bodyParams: Param[]): string {
-  let result = ', null';
+function getHttpMethodSecondParam(methodType: string, queryParams: Param[], bodyParams: Param[]): string {
+  let result = '';
+  const emptyParam = ', {}';
   const templateParamOption: string = String(fs.readFileSync('src/templates/http-method-param-options.ts'));
   if (['GET', 'DELETE'].indexOf(methodType.toUpperCase()) > -1) {
     if (queryParams && queryParams.length) { // QUERY PARAMS
@@ -474,13 +495,15 @@ function getHttpMethodSecondParam(methodType: string, queryParams: string[], bod
       } else {
         result = ', ' + METHOD_PARAM_NAME;
       }
+    } else {
+      result = emptyParam;
     }
   }
 
   return result;
 }
 
-function getHttpMethodThirdParam(methodType: string, queryParams: string[], bodyParams: Param[]): string {
+function getHttpMethodThirdParam(methodType: string, queryParams: Param[], bodyParams: Param[]): string {
   let result = '';
   const templateParamOption: string = String(fs.readFileSync('src/templates/http-method-param-options.ts'));
   if (['GET', 'DELETE'].indexOf(methodType.toUpperCase()) > -1) {
@@ -519,6 +542,7 @@ interface Config {
   };
   imports: string[];
   endOfMethod: string[];
+  generateParamIfNoExistTypeDeclaration: boolean;
 }
 
 interface Param {
@@ -528,6 +552,7 @@ interface Param {
 }
 
 enum TypesEnum {
+  ANY = 'any',
   STRING = 'string',
   NUMBER = 'number',
   ARRAY = '<T>[]',
