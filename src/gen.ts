@@ -24,6 +24,7 @@ const TAB6 = '      ';
 const TAB4 = '    ';
 const TAB2 = '  ';
 const TAB1 = ' ';
+const COMMA = ',';
 const REQUEST_TYPE_SUFIX = 'Request';
 const METHOD_PARAM_NAME = 'request';
 const METHOD_PARAM_NAME_FOR_BODY = 'requestBody';
@@ -293,36 +294,36 @@ function getMethodParams(unitName, node: any, params: Param[], queryParams: Para
   if (params && params.length > 0) {
     paramsString = params.map((param, i) => {
       if (param) {
-        return (i === 0 ? '' : ',') + param.name + ': ' + param.type;
+        return (i === 0 ? '' : COMMA) + param.name + ': ' + param.type;
       } else {
         return '';
       }
     }).join('');
-
-    // QUERY PARAMS
-    if (queryParams && queryParams.length > 0) {
-      queryParamsString = ',' + TAB1 + templateMethodRequest
-        .replace(/\r?\n|\r/g, '')
-        .replace(/@@PARAM_NAME@@/g, bodyVariables && bodyVariables.length > 0 ? METHOD_PARAM_NAME_FOR_QUERY : METHOD_PARAM_NAME)
-        .replace(/@@METHOD_NAME_FIRST_UP@@/g, firstUp(unitName))
-        .replace(/@@REQUEST_TYPE_SUFIX@@/g, REQUEST_TYPE_SUFIX);
-    }
-
-    // BODY PARAMS
-    if (bodyVariables && bodyVariables.length > 0) {
-      bodyParamsString = ',' + TAB1 + templateMethodRequest
-        .replace(/\r?\n|\r/g, '')
-        .replace(/@@PARAM_NAME@@/g, bodyVariables && bodyVariables.length > 0 ? METHOD_PARAM_NAME_FOR_BODY : METHOD_PARAM_NAME)
-        .replace(/@@METHOD_NAME_FIRST_UP@@/g, firstUp(unitName))
-        .replace(/@@REQUEST_TYPE_SUFIX@@/g, REQUEST_TYPE_SUFIX);
-    }
-
-    result = templateMethodParams
-      .replace(/\r?\n|\r/g, '')
-      .replace(/@@SIMPLE_PARAMS@@/g, paramsString)
-      .replace(/@@REQUEST_PARAMS@@/g, queryParamsString)
-      .replace(/@@REQUEST_BODY@@/g, bodyParamsString);
   }
+
+  // QUERY PARAMS
+  if (queryParams && queryParams.length > 0) {
+    queryParamsString = (paramsString ? COMMA + TAB1 : '') + templateMethodRequest
+      .replace(/\r?\n|\r/g, '')
+      .replace(/@@PARAM_NAME@@/g, bodyVariables && bodyVariables.length > 0 ? METHOD_PARAM_NAME_FOR_QUERY : METHOD_PARAM_NAME)
+      .replace(/@@METHOD_NAME_FIRST_UP@@/g, firstUp(unitName))
+      .replace(/@@REQUEST_TYPE_SUFIX@@/g, REQUEST_TYPE_SUFIX);
+  }
+
+  // BODY PARAMS
+  if (bodyVariables && bodyVariables.length > 0) {
+    bodyParamsString = (paramsString || queryParamsString ? COMMA + TAB1 : '') + templateMethodRequest
+      .replace(/\r?\n|\r/g, '')
+      .replace(/@@PARAM_NAME@@/g, bodyVariables && bodyVariables.length > 0 ? METHOD_PARAM_NAME_FOR_BODY : METHOD_PARAM_NAME)
+      .replace(/@@METHOD_NAME_FIRST_UP@@/g, firstUp(unitName))
+      .replace(/@@REQUEST_TYPE_SUFIX@@/g, REQUEST_TYPE_SUFIX);
+  }
+
+  result = templateMethodParams
+    .replace(/\r?\n|\r/g, '')
+    .replace(/@@SIMPLE_PARAMS@@/g, paramsString)
+    .replace(/@@REQUEST_PARAMS@@/g, queryParamsString)
+    .replace(/@@REQUEST_BODY@@/g, bodyParamsString);
 
   return result;
 }
@@ -441,7 +442,7 @@ function getQueryParamsFromUrl(url: string, variables: Param[], config: Config):
     const fragment = url.substr(posPrefix + URL_QUERY_PARAMS_PREFIX.length);
     const posSufix = fragment.indexOf(URL_PARAMS_SUFIX);
     params = fragment.substr(0, posSufix)
-      .split(',');
+      .split(COMMA);
   }
   params.forEach(item => {
     const find: Param = variables.filter(variable => variable.name === item)[0];
