@@ -194,10 +194,10 @@ function getResourceGroup(content) {
           .replace(/@@URL@@/g, urlWithoutQueryParams);
 
         // CREATE TYPE - QUERY PARAMS
-        createTypeRequest(config, unitName, groupName, url, urlQueryParams);
+        createTypeRequest(config, unitName, groupName, url, urlQueryParams, bodyVariables);
 
         // CREATE TYPE - BODY PARAMS
-        createTypeRequest(config, unitName, groupName, url, bodyVariables);
+        createTypeRequest(config, unitName, groupName, url, urlQueryParams, bodyVariables);
 
         // CREATE TYPE - RESPONSE
         createTypeResponse(config, unitName, groupName, responseVariables);
@@ -370,15 +370,17 @@ function getBodyVariables(node: any): Param[] {
   return [];
 }
 
-function createTypeRequest(config: Config, unitName: string, groupName: string, url: string, params: Param[]) {
+function createTypeRequest(config: Config, unitName: string, groupName: string, url: string, queryParams: Param[],
+                           bodyVariables: Param[]) {
   const templateInterfaceProperty: string = String(fs.readFileSync('src/templates/interface-property.ts'));
   const templateInterface: string = String(fs.readFileSync('src/templates/interface.ts'));
   const typeFileNameRequest = decamelize(unitName + REQUEST_TYPE_SUFIX, '-') + FILE_EXT;
   let contentTypeRequest: string;
   let properties = '';
 
-  if (params) {
-    params.forEach((param: Param) => {
+  // TODO: bodyVariables
+  if (queryParams) {
+    queryParams.forEach((param: Param) => {
       if (properties) {
         properties += EOF + TAB2;
       }
