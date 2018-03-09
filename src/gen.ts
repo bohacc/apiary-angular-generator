@@ -25,6 +25,7 @@ const TAB4 = '    ';
 const TAB2 = '  ';
 const TAB1 = ' ';
 const COMMA = ',';
+const SLASH = '/';
 const REQUEST_TYPE_SUFIX = 'Request';
 const METHOD_PARAM_NAME = 'request';
 const METHOD_PARAM_NAME_FOR_BODY = 'requestBody';
@@ -76,8 +77,8 @@ function getResourceGroup(content) {
   // TODO: set default config
 
   fs.mkdirpSync(config.outDir.path);
-  fs.mkdirpSync(config.outDir.path + '/' + config.outDir.dirNameServices);
-  fs.mkdirpSync(config.outDir.path + '/' + config.outDir.dirNameTypes);
+  fs.mkdirpSync(config.outDir.path + SLASH + config.outDir.dirNameServices);
+  fs.mkdirpSync(config.outDir.path + SLASH + config.outDir.dirNameTypes);
 
   recurse(content, [{name: 'element', value: CATEGORY}], RESOURCE_GROUP, result);
   // console.log(result);
@@ -99,7 +100,7 @@ function getResourceGroup(content) {
     const serviceFileName = decamelize(groupName + config.fileName.sufix, '-');
 
     // DIR
-    fs.mkdirpSync(config.outDir.path + '/' + config.outDir.dirNameTypes + '/' + decamelize(groupName, '-'));
+    fs.mkdirpSync(config.outDir.path + SLASH + config.outDir.dirNameTypes + SLASH + decamelize(groupName, '-'));
 
     console.log('*******************');
     console.log(getTitle(groupNode));
@@ -131,6 +132,7 @@ function getResourceGroup(content) {
         const bodyVariables: Param[] = getBodyVariables(node);
         const urlParams: Param[] = getParamsFromUrl(url, hrefVariables);
         const urlQueryParams: Param[] = getQueryParamsFromUrl(url, hrefVariables, config);
+        const responseVariables: Param[] = []; // TODO: implement
 
         const secondParam = getHttpMethodSecondParam(methodType, urlQueryParams, bodyVariables);
         const thirdParam = getHttpMethodThirdParam(methodType, urlQueryParams, bodyVariables);
@@ -167,7 +169,6 @@ function getResourceGroup(content) {
         /// QUERY PARAMS
 
         if (urlQueryParams && urlQueryParams.length > 0) {
-          console.log(JSON.stringify(urlQueryParams));
           convertQueryParams = EOF + TAB4 + templateConvertQueryParams
             .replace(/\r?\n|\r/g, '')
             .replace(/@@PARAM_NAME@@/g, METHOD_PARAM_NAME);
@@ -192,10 +193,14 @@ function getResourceGroup(content) {
           .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + decamelize(unitName).toUpperCase())
           .replace(/@@URL@@/g, urlWithoutQueryParams);
 
-        // CREATE TYPES
-        createTypeRequest(config, unitName, groupName, url, hrefVariables);
+        // CREATE TYPE - QUERY PARAMS
+        createTypeRequest(config, unitName, groupName, url, urlQueryParams);
 
-        // createTypeResponse(config, unitName, groupName, hrefVariables);
+        // CREATE TYPE - BODY PARAMS
+        createTypeRequest(config, unitName, groupName, url, bodyVariables);
+
+        // CREATE TYPE - RESPONSE
+        createTypeResponse(config, unitName, groupName, responseVariables);
 
         // TODO: create ENUM
 
@@ -220,7 +225,7 @@ function getResourceGroup(content) {
       + EOF;
 
     // CREATE SERVICE
-    fs.writeFileSync( config.outDir.path + '/' + config.outDir.dirNameServices + '/' + serviceFileName, contentService, 'utf8');
+    fs.writeFileSync( config.outDir.path + SLASH + config.outDir.dirNameServices + SLASH + serviceFileName, contentService, 'utf8');
 
     console.log('/////////////////////////');
   });
@@ -365,26 +370,23 @@ function getBodyVariables(node: any): Param[] {
   return [];
 }
 
-function createTypeRequest(config: Config, unitName: string, groupName: string, url: string, hrefVariables: Param[]) {
+function createTypeRequest(config: Config, unitName: string, groupName: string, url: string, params: Param[]) {
   const templateInterfaceProperty: string = String(fs.readFileSync('src/templates/interface-property.ts'));
   const templateInterface: string = String(fs.readFileSync('src/templates/interface.ts'));
   const typeFileNameRequest = decamelize(unitName + REQUEST_TYPE_SUFIX, '-') + FILE_EXT;
-  const paramsFromUrl: Param[] = getQueryParamsFromUrl(url, hrefVariables, config);
   let contentTypeRequest: string;
   let properties = '';
 
-  if (hrefVariables) {
-    hrefVariables.forEach((param: Param) => {
+  if (params) {
+    params.forEach((param: Param) => {
       if (properties) {
         properties += EOF + TAB2;
       }
-      if (paramsFromUrl.filter(item => item.name === param.name).length > 0) {
-        properties += templateInterfaceProperty
-          .replace(EOF, '')
-          .replace(/@@KEY@@/g, param.name)
-          .replace(/@@REQUIRED@@/g, param.required ? '' : NO_REQUIRED_CHAR)
-          .replace(/@@VALUE@@/g, param.type);
-      }
+      properties += templateInterfaceProperty
+        .replace(EOF, '')
+        .replace(/@@KEY@@/g, param.name)
+        .replace(/@@REQUIRED@@/g, param.required ? '' : NO_REQUIRED_CHAR)
+        .replace(/@@VALUE@@/g, param.type);
     });
   }
 
@@ -396,28 +398,28 @@ function createTypeRequest(config: Config, unitName: string, groupName: string, 
 
   /// SAVE TYPE TO FILE
   if (contentTypeRequest) {
-    fs.writeFileSync(config.outDir.path + '/' + config.outDir.dirNameTypes + '/' + decamelize(groupName, '-') + '/' +
+    fs.writeFileSync(config.outDir.path + SLASH + config.outDir.dirNameTypes + SLASH + decamelize(groupName, '-') + SLASH +
       typeFileNameRequest, contentTypeRequest, 'utf8');
   }
 }
 
-function createTypeResponse(config: Config, unitName: string, groupName: string, hrefVariables: any[]) {
+function createTypeResponse(config: Config, unitName: string, groupName: string, params: Param[]) {
   const templateInterfaceProperty: string = String(fs.readFileSync('src/templates/interface-property.ts'));
   const templateInterface: string = String(fs.readFileSync('src/templates/interface.ts'));
   const typeFileName = decamelize(unitName, '-') + FILE_EXT;
   let contentTypeResponse: string;
   let properties = '';
 
-  if (hrefVariables[0]) {
-    hrefVariables[0].content.forEach((hrefVariable) => {
+  if (params) {
+    params.forEach((param) => {
       if (properties) {
         properties += EOF + TAB2;
       }
       properties += templateInterfaceProperty
         .replace(EOF, '')
-        .replace(/@@KEY@@/g, getPropertyName(hrefVariable))
-        .replace(/@@REQUIRED@@/g, getPropertyRequired(hrefVariable) ? '' : NO_REQUIRED_CHAR)
-        .replace(/@@VALUE@@/g, getPropertyType(hrefVariable));
+        .replace(/@@KEY@@/g, param.name)
+        .replace(/@@REQUIRED@@/g, param.required ? '' : NO_REQUIRED_CHAR)
+        .replace(/@@VALUE@@/g, param.type);
     });
   }
 
@@ -429,7 +431,7 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
 
   /// SAVE TYPE TO FILE
   if (contentTypeResponse) {
-    fs.writeFileSync(config.outDir.path + '/' + config.outDir.dirNameTypes + '/' + decamelize(groupName, '-') + '/' +
+    fs.writeFileSync(config.outDir.path + SLASH + config.outDir.dirNameTypes + SLASH + decamelize(groupName, '-') + SLASH +
       typeFileName, contentTypeResponse, 'utf8');
   }
 }
