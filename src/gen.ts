@@ -455,7 +455,7 @@ function createTypeRequest(config: Config, name: string, groupName: string, url:
         .replace(EOF, '')
         .replace(/@@KEY@@/g, param.name)
         .replace(/@@REQUIRED@@/g, param.required ? '' : NO_REQUIRED_CHAR)
-        .replace(/@@VALUE@@/g, param.type);
+        .replace(/@@VALUE@@/g, createType(param.type));
     });
   }
 
@@ -488,7 +488,7 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
         .replace(EOF, '')
         .replace(/@@KEY@@/g, param.name)
         .replace(/@@REQUIRED@@/g, param.required ? '' : NO_REQUIRED_CHAR)
-        .replace(/@@VALUE@@/g, param.type);
+        .replace(/@@VALUE@@/g, createType(param.type));
     });
   }
 
@@ -503,6 +503,11 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
     fs.writeFileSync(config.outDir.path + SLASH + config.outDir.dirNameTypes + SLASH + decamelize(groupName, '-') + SLASH +
       typeFileName, contentTypeResponse, 'utf8');
   }
+}
+
+function createType(value: any) {
+  // TODO: implementation
+  return value;
 }
 
 function getQueryParamsFromUrl(url: string, variables: Param[], config: Config): Param[] {
