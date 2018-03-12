@@ -8,8 +8,9 @@ const RESOURCE = 'resource';
 const TRANSITION = 'transition';
 const CATEGORY = 'category';
 const META = 'meta';
-const HTTPREQUEST = 'httpRequest';
+const HTTP_REQUEST = 'httpRequest';
 const HREF_VARIABLES = 'hrefVariables';
+const DATA_STRUCTURE = 'dataStructure';
 const CLASSES = 'classes';
 const SEMICOLON = ';';
 const URL_QUERY_PARAMS_PREFIX = '{?';
@@ -27,6 +28,7 @@ const TAB1 = ' ';
 const COMMA = ',';
 const SLASH = '/';
 const REQUEST_TYPE_SUFIX = 'Request';
+const REQUEST_BODY_TYPE_SUFIX = 'RequestBody';
 const METHOD_PARAM_NAME = 'request';
 const METHOD_PARAM_NAME_FOR_BODY = 'requestBody';
 const METHOD_PARAM_NAME_FOR_QUERY = 'requestQuery';
@@ -117,15 +119,12 @@ function getResourceGroup(content) {
       result3.values.forEach((node) => {
 
         const unitName: string = camelCase(getTitle(node));
-        const unitNameRequest: string = camelCase(getTitle(node) + REQUEST_TYPE_SUFIX);
         console.log(unitName);
 
         const url = getHref(node) || getHref(subGroup);
         const urlWithoutQueryParams: string = prepareHref(url);
         const unitNameFirstUpper: string = firstUp(unitName);
-        const unitNameRequestFirstUpper: string = firstUp(unitNameRequest);
         const typeFileName = decamelize(unitName, '-') + FILE_EXT;
-        const typeRequestFileName = decamelize(unitNameRequest, '-');
         const endOfMethod = config.endOfMethod ? config.endOfMethod.join(EOF + TAB6) : null;
         const methodType = getHttpMethod(node);
         const hrefVariables: Param[] = getHrefVariables(node);
@@ -139,21 +138,16 @@ function getResourceGroup(content) {
         let convertQueryParams = '';
         let replaceParams = '';
 
-        // IMPORTS
-        classImports += templateClassImport
-          .replace(/@@METHOD_NAME_FIRST_UP@@/g, unitNameFirstUpper)
-          .replace(/@@DIR_NAME@@/g, decamelize(groupName, '-'))
-          .replace(/@@TYPES_DIR_NAME@@/g, config.outDir.dirNameTypes)
-          .replace(/@@FILE_NAME@@/g, typeFileName);
+        // TOOL FUNCTION
+        const addClassImport = (methodName: string, fileName: string) => {
+          classImports += templateClassImport
+            .replace(/@@METHOD_NAME_FIRST_UP@@/g, methodName)
+            .replace(/@@DIR_NAME@@/g, decamelize(groupName, '-'))
+            .replace(/@@TYPES_DIR_NAME@@/g, config.outDir.dirNameTypes)
+            .replace(/@@FILE_NAME@@/g, fileName);
+        };
 
-        // IMPORTS REQUEST FILE
-        classImports += templateClassImport
-          .replace(/@@METHOD_NAME_FIRST_UP@@/g, unitNameRequestFirstUpper)
-          .replace(/@@DIR_NAME@@/g, decamelize(groupName, '-'))
-          .replace(/@@TYPES_DIR_NAME@@/g, config.outDir.dirNameTypes)
-          .replace(/@@FILE_NAME@@/g, typeRequestFileName);
-
-        // METHODS
+        // *** METHODS *** //
 
         /// PARAMS
         if (urlParams) {
@@ -173,19 +167,19 @@ function getResourceGroup(content) {
             .replace(/\r?\n|\r/g, '')
             .replace(/@@PARAM_NAME@@/g, METHOD_PARAM_NAME);
         }
-
+console.log(JSON.stringify(node));
         methods += (methods ? EOF : '') + templateHttpMethod
           .replace(/@@METHOD_NAME@@/g, unitNameFirstUpper)
           .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + decamelize(unitName).toUpperCase())
           .replace(/@@END_OF_METHOD@@/g, EOF + TAB6 + endOfMethod || SEMICOLON)
-          .replace(/@@METHOD_NAME_FIRST_UP@@/g, firstUp(unitName))
+          .replace(/@@METHOD_NAME_FIRST_UP@@/g, responseVariables && responseVariables.length ? firstUp(unitName) : TypesEnum.ANY)
           .replace(/@@HTTP_METHOD@@/g, methodType.toLowerCase())
           .replace(/@@HTTP_SERVICE_SECOND_PARAM@@/g, secondParam)
           .replace(/@@HTTP_SERVICE_THIRD_PARAM@@/g, thirdParam)
           .replace(/@@CONVERT_TO_QUERY_PARAMS@@/g, convertQueryParams)
           .replace(/@@REPLACE_URL_PARAMS@@/g, replaceParams)
           .replace(/@@METHOD_PARAMS@@/g,
-            getMethodParams(firstUp(unitName), node, urlParams, urlQueryParams, hrefVariables, bodyVariables)
+            getMethodParams(firstUp(unitName), urlParams, urlQueryParams, bodyVariables)
           )
           .replace(/@@HTTP_METHOD_PREFIX@@/g, config.method.addMethodTypeToPrefixName ? firstUp(methodType) : '');
 
@@ -193,14 +187,64 @@ function getResourceGroup(content) {
           .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + decamelize(unitName).toUpperCase())
           .replace(/@@URL@@/g, urlWithoutQueryParams);
 
-        // CREATE TYPE - QUERY PARAMS
-        createTypeRequest(config, unitName, groupName, url, urlQueryParams, bodyVariables);
+        // *** END METHODS *** //
 
-        // CREATE TYPE - BODY PARAMS
-        createTypeRequest(config, unitName, groupName, url, urlQueryParams, bodyVariables);
 
-        // CREATE TYPE - RESPONSE
-        createTypeResponse(config, unitName, groupName, responseVariables);
+
+
+        // CREATE TYPES
+        if (urlQueryParams && urlQueryParams.length > 0 && bodyVariables && bodyVariables.length > 0) {
+          let name;
+          let fileName;
+          // IMPORTS REQUEST FILE
+          name = firstUp(unitName + REQUEST_TYPE_SUFIX);
+          fileName = decamelize(unitName + REQUEST_TYPE_SUFIX, '-');
+          addClassImport(name, fileName);
+
+          // CREATE TYPE - QUERY PARAMS
+          createTypeRequest(config, unitName + REQUEST_TYPE_SUFIX, groupName, url, urlQueryParams);
+
+          // IMPORTS REQUEST FILE
+          name = firstUp(unitName + REQUEST_TYPE_SUFIX);
+          fileName = decamelize(unitName + REQUEST_TYPE_SUFIX, '-');
+          addClassImport(name, fileName);
+
+          // CREATE TYPE - BODY PARAMS
+          createTypeRequest(config, unitName + REQUEST_BODY_TYPE_SUFIX, groupName, url, bodyVariables);
+
+        } else if (urlQueryParams && urlQueryParams.length > 0) {
+          let name;
+          let fileName;
+
+          // IMPORTS REQUEST FILE
+          name = firstUp(unitName + REQUEST_TYPE_SUFIX);
+          fileName = decamelize(unitName + REQUEST_TYPE_SUFIX, '-');
+          addClassImport(name, fileName);
+
+          // CREATE TYPE - QUERY PARAMS
+          createTypeRequest(config, unitName + REQUEST_TYPE_SUFIX, groupName, url, urlQueryParams);
+
+        } else if (bodyVariables && bodyVariables.length > 0) {
+          let name;
+          let fileName;
+
+          // IMPORTS REQUEST FILE
+          name = firstUp(unitName + REQUEST_TYPE_SUFIX);
+          fileName = decamelize(unitName + REQUEST_TYPE_SUFIX, '-');
+          addClassImport(name, fileName);
+
+          // CREATE TYPE - BODY PARAMS
+          createTypeRequest(config, unitName + REQUEST_TYPE_SUFIX, groupName, url, bodyVariables);
+
+        }
+
+        // IMPORTS TYPE RESPONSE
+        if (responseVariables && responseVariables.length) {
+          // CREATE TYPE - RESPONSE
+          createTypeResponse(config, unitName, groupName, responseVariables);
+
+          addClassImport(unitNameFirstUpper, typeFileName);
+        }
 
         // TODO: create ENUM
 
@@ -262,7 +306,7 @@ function firstUp(value: string): string {
 
 function getHttpMethod(node: any): string {
   const resultHttpRequest: Result = {values: []};
-  recurse(node, [{name: 'element', value: HTTPREQUEST}], null, resultHttpRequest);
+  recurse(node, [{name: 'element', value: HTTP_REQUEST}], null, resultHttpRequest);
   // console.log(JSON.stringify(resultHttpRequest.values[0]));
   return resultHttpRequest.values[0] &&
     resultHttpRequest.values[0].attributes &&
@@ -286,11 +330,10 @@ function getPropertyRequired(node: any): boolean {
   return node && node.attributes && node.attributes.typeAttributes && node.attributes.typeAttributes.indexOf(REQUIRED) > -1;
 }
 
-function getMethodParams(unitName, node: any, params: Param[], queryParams: Param[],
-                         hrefVariables: Param[], bodyVariables: Param[]): string {
+function getMethodParams(unitName, params: Param[], queryParams: Param[], bodyVariables: Param[]): string {
   const templateMethodParams: string = String(fs.readFileSync('src/templates/http-method-params.ts'));
   const templateMethodRequest: string = String(fs.readFileSync('src/templates/http-method-request.ts'));
-  let result = '';
+  let result;
   let paramsString = '';
   let queryParamsString = '';
   let bodyParamsString = '';
@@ -308,6 +351,8 @@ function getMethodParams(unitName, node: any, params: Param[], queryParams: Para
 
   // QUERY PARAMS
   if (queryParams && queryParams.length > 0) {
+    //  console.log('AAAAAAAAAAAAAAA');
+    //  console.log(JSON.stringify(queryParams));
     queryParamsString = (paramsString ? COMMA + TAB1 : '') + templateMethodRequest
       .replace(/\r?\n|\r/g, '')
       .replace(/@@PARAM_NAME@@/g, bodyVariables && bodyVariables.length > 0 ? METHOD_PARAM_NAME_FOR_QUERY : METHOD_PARAM_NAME)
@@ -317,9 +362,11 @@ function getMethodParams(unitName, node: any, params: Param[], queryParams: Para
 
   // BODY PARAMS
   if (bodyVariables && bodyVariables.length > 0) {
+    //  console.log('BBBBBBBBBBBBBBBB');
+    //  console.log(JSON.stringify(bodyVariables));
     bodyParamsString = (paramsString || queryParamsString ? COMMA + TAB1 : '') + templateMethodRequest
       .replace(/\r?\n|\r/g, '')
-      .replace(/@@PARAM_NAME@@/g, bodyVariables && bodyVariables.length > 0 ? METHOD_PARAM_NAME_FOR_BODY : METHOD_PARAM_NAME)
+      .replace(/@@PARAM_NAME@@/g, queryParams && queryParams.length > 0 ? METHOD_PARAM_NAME_FOR_BODY : METHOD_PARAM_NAME)
       .replace(/@@METHOD_NAME_FIRST_UP@@/g, firstUp(unitName))
       .replace(/@@REQUEST_TYPE_SUFIX@@/g, REQUEST_TYPE_SUFIX);
   }
@@ -352,35 +399,34 @@ function getHrefVariables(node: any): Param[] {
 }
 
 function getBodyVariables(node: any): Param[] {
-  /*const hrefVariables: Result = {values: []};
+  const httpRequest: Result = {values: []};
+  const dataStructure: Result = {values: []};
   const variables: any[] = [];
-  recurse(node, [{name: 'element', value: HREF_VARIABLES}], null, hrefVariables);
+  recurse(node, [{name: 'element', value: HTTP_REQUEST}], null, httpRequest);
+  recurse(httpRequest, [{name: 'element', value: DATA_STRUCTURE}], null, dataStructure);
 
-  if (hrefVariables.values[0]) {
-    hrefVariables.values[0].content.forEach((hrefVariable) => {
+  if (dataStructure.values[0] && dataStructure.values[0].content && dataStructure.values[0].content[0]) {
+    dataStructure.values[0].content[0].content.forEach((variable) => {
       variables.push({
-        name: getPropertyName(hrefVariable),
-        type: getPropertyType(hrefVariable),
-        required: getPropertyRequired(hrefVariable)
+        name: getPropertyName(variable),
+        type: getPropertyType(variable),
+        required: getPropertyRequired(variable)
       });
     });
   }
 
-  return variables;*/
-  return [];
+  return variables || [];
 }
 
-function createTypeRequest(config: Config, unitName: string, groupName: string, url: string, queryParams: Param[],
-                           bodyVariables: Param[]) {
+function createTypeRequest(config: Config, name: string, groupName: string, url: string, params: Param[]) {
   const templateInterfaceProperty: string = String(fs.readFileSync('src/templates/interface-property.ts'));
   const templateInterface: string = String(fs.readFileSync('src/templates/interface.ts'));
-  const typeFileNameRequest = decamelize(unitName + REQUEST_TYPE_SUFIX, '-') + FILE_EXT;
+  const typeFileNameRequest = decamelize(name, '-') + FILE_EXT;
   let contentTypeRequest: string;
   let properties = '';
 
-  // TODO: bodyVariables
-  if (queryParams) {
-    queryParams.forEach((param: Param) => {
+  if (params) {
+    params.forEach((param: Param) => {
       if (properties) {
         properties += EOF + TAB2;
       }
@@ -394,7 +440,7 @@ function createTypeRequest(config: Config, unitName: string, groupName: string, 
 
   if (properties) {
     contentTypeRequest = templateInterface
-      .replace(/@@INTERFACE_NAME@@/g, firstUp(unitName) + REQUEST_TYPE_SUFIX)
+      .replace(/@@INTERFACE_NAME@@/g, firstUp(name))
       .replace(/@@PROPERTIES@@/g, properties);
   }
 
