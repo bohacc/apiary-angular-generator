@@ -12,6 +12,7 @@ const HTTP_REQUEST = 'httpRequest';
 const HTTP_RESPONSE = 'httpResponse';
 const HREF_VARIABLES = 'hrefVariables';
 const DATA_STRUCTURE = 'dataStructure';
+const DATA_STRUCTURES = 'dataStructures';
 const CLASSES = 'classes';
 const SEMICOLON = ';';
 const URL_QUERY_PARAMS_PREFIX = '{?';
@@ -43,7 +44,7 @@ export function gen() {
     if (err) {
       console.log(err);
     }
-    // console.log(res);
+    // console.log(JSON.stringify(res));
     // this.content = res;
     getResourceGroup(res);
   });
@@ -76,6 +77,7 @@ function recurse(content: any, nodes: Node[], meta: string, result: Result) {
 
 function getResourceGroup(content) {
   const result: Result = {values: []};
+  const dataStructures: Result = {values: []};
   const config: Config = JSON.parse(String(fs.readFileSync('apiary.conf.json')));
   // TODO: set default config
 
@@ -84,7 +86,10 @@ function getResourceGroup(content) {
   fs.mkdirpSync(config.outDir.path + SLASH + config.outDir.dirNameTypes);
 
   recurse(content, [{name: 'element', value: CATEGORY}], RESOURCE_GROUP, result);
-  // console.log(result);
+
+  // GET DATA STRUCTURES / TYPES
+  recurse(content, [{name: 'element', value: CATEGORY}], DATA_STRUCTURES, dataStructures);
+  console.log(JSON.stringify(dataStructures));
 
   result.values.forEach((groupNode) => {
     const result2: Result = {values: []};
