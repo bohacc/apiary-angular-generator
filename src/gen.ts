@@ -9,6 +9,7 @@ const TRANSITION = 'transition';
 const CATEGORY = 'category';
 const META = 'meta';
 const HTTP_REQUEST = 'httpRequest';
+const HTTP_RESPONSE = 'httpResponse';
 const HREF_VARIABLES = 'hrefVariables';
 const DATA_STRUCTURE = 'dataStructure';
 const CLASSES = 'classes';
@@ -131,7 +132,7 @@ function getResourceGroup(content) {
         const bodyVariables: Param[] = getBodyVariables(node);
         const urlParams: Param[] = getParamsFromUrl(url, hrefVariables);
         const urlQueryParams: Param[] = getQueryParamsFromUrl(url, hrefVariables, config);
-        const responseVariables: Param[] = []; // TODO: implement
+        const responseVariables: Param[] = getResponseVariables(node);
 
         const secondParam = getHttpMethodSecondParam(methodType, urlQueryParams, bodyVariables);
         const thirdParam = getHttpMethodThirdParam(methodType, urlQueryParams, bodyVariables);
@@ -404,6 +405,26 @@ function getBodyVariables(node: any): Param[] {
   const variables: any[] = [];
   recurse(node, [{name: 'element', value: HTTP_REQUEST}], null, httpRequest);
   recurse(httpRequest, [{name: 'element', value: DATA_STRUCTURE}], null, dataStructure);
+
+  if (dataStructure.values[0] && dataStructure.values[0].content && dataStructure.values[0].content[0]) {
+    dataStructure.values[0].content[0].content.forEach((variable) => {
+      variables.push({
+        name: getPropertyName(variable),
+        type: getPropertyType(variable),
+        required: getPropertyRequired(variable)
+      });
+    });
+  }
+
+  return variables || [];
+}
+
+function getResponseVariables(node: any): Param[] {
+  const httpResponse: Result = {values: []};
+  const dataStructure: Result = {values: []};
+  const variables: any[] = [];
+  recurse(node, [{name: 'element', value: HTTP_RESPONSE}], null, httpResponse);
+  recurse(httpResponse, [{name: 'element', value: DATA_STRUCTURE}], null, dataStructure);
 
   if (dataStructure.values[0] && dataStructure.values[0].content && dataStructure.values[0].content[0]) {
     dataStructure.values[0].content[0].content.forEach((variable) => {
