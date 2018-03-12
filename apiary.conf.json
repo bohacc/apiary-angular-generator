@@ -11,7 +11,7 @@
     "addMethodTypeToPrefixName": false
   },
   "imports": [
-    "import { HttpUtils } from '../utils/http-utils;'"
+    "import { HttpUtils } from '../../utils/http-utils';"
   ],
   "endOfMethod": [
     ".catch(HttpUtils.handleHttpError);"

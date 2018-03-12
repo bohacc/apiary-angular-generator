@@ -125,7 +125,7 @@ function getResourceGroup(content) {
         const url = getHref(node) || getHref(subGroup);
         const urlWithoutQueryParams: string = prepareHref(url);
         const unitNameFirstUpper: string = firstUp(unitName);
-        const typeFileName = decamelize(unitName, '-') + FILE_EXT;
+        const typeFileName = decamelize(unitName, '-');
         const endOfMethod = config.endOfMethod ? config.endOfMethod.join(EOF + TAB6) : null;
         const methodType = getHttpMethod(node);
         const hrefVariables: Param[] = getHrefVariables(node);
@@ -168,7 +168,7 @@ function getResourceGroup(content) {
             .replace(/\r?\n|\r/g, '')
             .replace(/@@PARAM_NAME@@/g, METHOD_PARAM_NAME);
         }
-console.log(JSON.stringify(node));
+
         methods += (methods ? EOF : '') + templateHttpMethod
           .replace(/@@METHOD_NAME@@/g, unitNameFirstUpper)
           .replace(/@@URL_PROP_NAME@@/g, URL_PROP_NAME_PREFIX + decamelize(unitName).toUpperCase())
@@ -494,7 +494,7 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
 
   if (properties) {
     contentTypeResponse = templateInterface
-      .replace(/@@INTERFACE_NAME@@/g, firstUp(unitName) + REQUEST_TYPE_SUFIX)
+      .replace(/@@INTERFACE_NAME@@/g, firstUp(unitName))
       .replace(/@@PROPERTIES@@/g, properties);
   }
 
