@@ -77,7 +77,6 @@ function recurse(content: any, nodes: Node[], meta: string, result: Result) {
 
 function getResourceGroup(content) {
   const result: Result = {values: []};
-  const dataStructures: Result = {values: []};
   const config: Config = JSON.parse(String(fs.readFileSync('apiary.conf.json')));
   // TODO: set default config
 
@@ -88,8 +87,13 @@ function getResourceGroup(content) {
   recurse(content, [{name: 'element', value: CATEGORY}], RESOURCE_GROUP, result);
 
   // GET DATA STRUCTURES / TYPES
-  recurse(content, [{name: 'element', value: CATEGORY}], DATA_STRUCTURES, dataStructures);
-  console.log(JSON.stringify(dataStructures));
+  const dataStructures: any[] = getDataStructures(content);
+
+  // CREATE GLOBAL TYPES
+  const structures: Structure[] = createTypes(dataStructures);
+
+  // CREATE TYPE FILES
+  createTypeFiles(structures, config);
 
   result.values.forEach((groupNode) => {
     const result2: Result = {values: []};
@@ -99,6 +103,7 @@ function getResourceGroup(content) {
     const templateUrlConsts: string = String(fs.readFileSync('src/templates/url-consts.ts'));
     const templateParamsReplace: string = String(fs.readFileSync('src/templates/http-method-params-replace.ts'));
     const templateConvertQueryParams: string = String(fs.readFileSync('src/templates/http-method-convert-to-query-params.ts'));
+
     let contentService = '';
     let methods = '';
     let classImports = '';
@@ -133,11 +138,11 @@ function getResourceGroup(content) {
         const typeFileName = decamelize(unitName, '-');
         const endOfMethod = config.endOfMethod ? config.endOfMethod.join(EOF + TAB6) : null;
         const methodType = getHttpMethod(node);
-        const hrefVariables: Param[] = getHrefVariables(node);
-        const bodyVariables: Param[] = getBodyVariables(node);
+        const hrefVariables: Param[] = getHrefVariables(node, structures);
+        const bodyVariables: Param[] = getBodyVariables(node, structures);
         const urlParams: Param[] = getParamsFromUrl(url, hrefVariables);
         const urlQueryParams: Param[] = getQueryParamsFromUrl(url, hrefVariables, config);
-        const responseVariables: Param[] = getResponseVariables(node);
+        const responseVariables: Param[] = getResponseVariables(node, structures);
 
         const secondParam = getHttpMethodSecondParam(methodType, urlQueryParams, bodyVariables);
         const thirdParam = getHttpMethodThirdParam(methodType, urlQueryParams, bodyVariables);
@@ -328,12 +333,38 @@ function getPropertyName(node: any): string {
   return node && node.content && node.content.key && node.content.key.content ? node.content.key.content : '';
 }
 
-function getPropertyType(node: any): string {
+function getPropertyType(node: any, structures: Structure[]): string {
+  // TODO: find structures
   return node && node.content && node.content.value && node.content.value.element ? node.content.value.element : '';
 }
 
 function getPropertyRequired(node: any): boolean {
   return node && node.attributes && node.attributes.typeAttributes && node.attributes.typeAttributes.indexOf(REQUIRED) > -1;
+}
+
+function getDataStructures(content: any): DataStructure[] {
+  // TODO: impl
+  const resultDataStructures: Result = {values: []};
+  const result: Structure[] = [];
+  recurse(content, [{name: 'element', value: CATEGORY}], DATA_STRUCTURES, resultDataStructures);
+  console.log(JSON.stringify(resultDataStructures));
+
+  if (resultDataStructures.values[0]) {
+    const types: DataStructure[] = resultDataStructures.values[0].content;
+    // ONE TYPE
+    /*types.forEach((item: DataStructure) => {
+      // PROPERTIES
+      item.content.forEach((prop) => {
+        result.push({
+          code: prop.meta.id.content,
+          name: prop.meta.
+        });
+      });
+    });*/
+  }
+
+  // createType();
+  return resultDataStructures.values[0] ? resultDataStructures.values[0].content : [];
 }
 
 function getMethodParams(unitName, params: Param[], queryParams: Param[], bodyVariables: Param[]): string {
@@ -386,7 +417,7 @@ function getMethodParams(unitName, params: Param[], queryParams: Param[], bodyVa
   return result;
 }
 
-function getHrefVariables(node: any): Param[] {
+function getHrefVariables(node: any, structures: Structure[]): Param[] {
   const hrefVariables: Result = {values: []};
   const variables: any[] = [];
   recurse(node, [{name: 'element', value: HREF_VARIABLES}], null, hrefVariables);
@@ -395,7 +426,7 @@ function getHrefVariables(node: any): Param[] {
     hrefVariables.values[0].content.forEach((hrefVariable) => {
       variables.push({
         name: getPropertyName(hrefVariable),
-        type: getPropertyType(hrefVariable),
+        type: getPropertyType(hrefVariable, structures),
         required: getPropertyRequired(hrefVariable)
       });
     });
@@ -460,7 +491,7 @@ function createTypeRequest(config: Config, name: string, groupName: string, url:
         .replace(EOF, '')
         .replace(/@@KEY@@/g, param.name)
         .replace(/@@REQUIRED@@/g, param.required ? '' : NO_REQUIRED_CHAR)
-        .replace(/@@VALUE@@/g, createType(param.type));
+        .replace(/@@VALUE@@/g, param.type);
     });
   }
 
@@ -493,7 +524,7 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
         .replace(EOF, '')
         .replace(/@@KEY@@/g, param.name)
         .replace(/@@REQUIRED@@/g, param.required ? '' : NO_REQUIRED_CHAR)
-        .replace(/@@VALUE@@/g, createType(param.type));
+        .replace(/@@VALUE@@/g, param.type);
     });
   }
 
@@ -510,9 +541,27 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
   }
 }
 
-function createType(value: any) {
+function createTypes(ds: DataStructure[]): Structure[] {
+  const result: Structure[] = [];
+  ds.forEach((data) => {
+    result.push(createType(data));
+  });
+  return result;
+}
+
+function createType(value: DataStructure): Structure {
   // TODO: implementation
-  return value;
+  const result: Structure = null;
+  return result;
+}
+
+function createTypeFiles(structure: Structure[], config: Config) {
+  const typeFileName = '';
+  const content = '';
+  if (content) {
+    fs.writeFileSync(config.outDir.path + SLASH + config.outDir.dirNameTypes + SLASH +
+      typeFileName, content, 'utf8');
+  }
 }
 
 function getQueryParamsFromUrl(url: string, variables: Param[], config: Config): Param[] {
@@ -639,4 +688,50 @@ enum TypesEnum {
   NUMBER = 'number',
   ARRAY = '<T>[]',
   BOOLEAN = 'boolean'
+}
+
+interface DataStructure {
+  element: string;
+  content: {
+    element: string;
+    meta: {
+      id: {
+        element: string;
+        attributes: any;
+        content: string;
+      };
+      decription?: {
+        element: string;
+        attributes: any;
+        content: string;
+      }
+    };
+    content: {
+      element: string;
+      meta: {
+        description: string;
+      };
+      attributes?: {
+        typeAttributes: string[];
+      };
+      content: {
+        key: {
+          element: string;
+          attributes: any;
+          content: string;
+        };
+        value: {
+          element: string;
+          attributes: any;
+          content: string;
+        };
+      }
+    }[]
+  }[];
+}
+
+interface Structure {
+  code: string;
+  name: string;
+  type: string;
 }
