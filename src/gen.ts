@@ -8,6 +8,8 @@ const RESOURCE = 'resource';
 const TRANSITION = 'transition';
 const CATEGORY = 'category';
 const META = 'meta';
+const REFERENCE = 'ref';
+const MEMBER = 'member';
 const HTTP_REQUEST = 'httpRequest';
 const HTTP_RESPONSE = 'httpResponse';
 const HREF_VARIABLES = 'hrefVariables';
@@ -90,7 +92,9 @@ function getResourceGroup(content) {
   const dataStructures: any[] = getDataStructures(content);
 
   // CREATE GLOBAL TYPES
-  const structures: Structure[] = getTypes(dataStructures);
+  const structures: Param[] = getTypes(dataStructures);
+  console.log('STRUCTURE');
+  console.log(JSON.stringify(structures));
 
   // CREATE TYPE FILES
   createTypeFiles(structures, config);
@@ -343,14 +347,14 @@ function getPropertyRequired(node: any): boolean {
   return node && node.attributes && node.attributes.typeAttributes && node.attributes.typeAttributes.indexOf(REQUIRED) > -1;
 }
 
-function getTypeName(value: string, structures: Structure[]): string {
-  const type: Structure = structures.filter(item => item.code === value)[0];
+function getTypeName(value: string, structures: Param[]): string {
+  const type: Param = structures.filter(item => item.code === value)[0];
   return type ? type.name : value;
 }
 
 function getDataStructures(content: any): DataStructure[] {
   const resultDataStructures: Result = {values: []};
-  const result: Structure[] = [];
+  const result: Param[] = [];
   recurse(content, [{name: 'element', value: CATEGORY}], DATA_STRUCTURES, resultDataStructures);
   // console.log(JSON.stringify(resultDataStructures));
 
@@ -422,7 +426,7 @@ function getMethodParams(unitName, params: Param[], queryParams: Param[], bodyVa
   return result;
 }
 
-function getHrefVariables(node: any, structures: Structure[]): Param[] {
+function getHrefVariables(node: any, structures: Param[]): Param[] {
   const hrefVariables: Result = {values: []};
   const variables: any[] = [];
   recurse(node, [{name: 'element', value: HREF_VARIABLES}], null, hrefVariables);
@@ -440,7 +444,7 @@ function getHrefVariables(node: any, structures: Structure[]): Param[] {
   return variables;
 }
 
-function getBodyVariables(node: any, structures: Structure[]): Param[] {
+function getBodyVariables(node: any, structures: Param[]): Param[] {
   const httpRequest: Result = {values: []};
   const dataStructure: Result = {values: []};
   const variables: any[] = [];
@@ -460,7 +464,7 @@ function getBodyVariables(node: any, structures: Structure[]): Param[] {
   return variables || [];
 }
 
-function getResponseVariables(node: any, structures: Structure[]): Param[] {
+function getResponseVariables(node: any, structures: Param[]): Param[] {
   const httpResponse: Result = {values: []};
   const dataStructure: Result = {values: []};
   const variables: Param[] = [];
@@ -472,14 +476,16 @@ function getResponseVariables(node: any, structures: Structure[]): Param[] {
       // FIND REF TYPE
       // TODO:
       const type: string = getPropertyType(variable);
-      const refType = getType(type);
+      const refType = findType(type, structures);
       if (refType) {
         variables.push(refType);
       } else {
         variables.push({
+          code: getPropertyName(variable),
           name: getPropertyName(variable),
           type: type,
-          required: getPropertyRequired(variable)
+          required: getPropertyRequired(variable),
+          import: null
         });
       }
     });
@@ -554,23 +560,59 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
   }
 }
 
-function getTypes(ds: DataStructure[]): Structure[] {
-  const result: Structure[] = [];
+function getTypes(ds: DataStructure[]): Param[] {
+  const result: Param[] = [];
   ds.forEach((data) => {
-    result.push(getType(data));
+    /*console.log('data');
+    console.log(JSON.stringify(data.content[0].meta.id.content));
+    console.log('/data');*/
+
+    const props: Param[] = [];
+    /*const required: boolean = data.content[0] && data.content[0].content && data.content[0].content[0] &&
+      data.content[0].content[0].attributes && data.content[0].content[0].attributes.typeAttributes ?
+        data.content[0].content[0].attributes.typeAttributes.indexOf(REQUIRED) > -1 : false;*/
+    const code = data.content[0] && data.content[0].meta && data.content[0].meta.id ? data.content[0].meta.id.content : null;
+    // PROPERTIES
+    if (data.content && data.content[0] && data.content[0].content && data.content[0].content.length) {
+      data.content[0].content.forEach((item) => {
+        if (item.element === REFERENCE) {
+          // TODO: find type
+          const codeProp: string = item.content.href;
+          props.push({
+            code: codeProp,
+            type: firstUp(camelCase(codeProp)),
+            name: firstUp(camelCase(codeProp)),
+          });
+        } else if (item.element === MEMBER) {
+          console.log(JSON.stringify(item));
+          const codeProp: string = item.content.key.content;
+          props.push({
+            code: codeProp,
+            type: firstUp(camelCase(codeProp)),
+            name: firstUp(camelCase(codeProp)),
+          });
+        }
+      });
+    }
+    result.push({
+      code: code,
+      type: firstUp(camelCase(code)),
+      name: firstUp(camelCase(code)),
+      required: false,
+      import: null,
+      props: props
+    });
   });
   return result;
 }
 
-function getType(type: string, structure: DataStructure): Structure {
-  const result: Structure = {
-    code: structure.content[0].meta.id.content,
-    name: firstUp(camelCase(structure.content[0].meta.id.content))
-  };
-  return result;
+function findType(type: string, structures: Param[]): Param {
+  // const structure: Structure = structures.filter(item => item.code === type)[0];
+  // firstUp(camelCase(find.content[0].meta.id.content))
+  return structures.filter(item => item.code === type)[0];
 }
 
-function createTypeFiles(structure: Structure[], config: Config) {
+function createTypeFiles(structure: Param[], config: Config) {
   const typeFileName = '';
   const content = '';
   if (content) {
@@ -593,9 +635,11 @@ function getQueryParamsFromUrl(url: string, variables: Param[], config: Config):
     const find: Param = variables.filter(variable => variable.name === item)[0];
     if (find || config.generateParamIfNoExistTypeDeclaration) {
       paramsType.push({
+        code: item,
         name: item,
         type: find ? find.type : TypesEnum.ANY,
-        required: find ? find.required : false
+        required: find ? find.required : false,
+        import: null
       });
     }
   });
@@ -612,9 +656,11 @@ function getParamsFromUrl(url: string, variables: Param[]): Param[] {
       const propertyName = item.split(URL_PARAMS_SUFIX)[0];
       const prop: Param = variables.filter((variable) => variable.name === propertyName)[0];
       params.push({
+        code: propertyName,
         name: propertyName,
         type: prop ? prop.type : TypesEnum.ANY,
-        required: prop ? prop.required : false
+        required: prop ? prop.required : false,
+        import: null
       });
     }
   });
@@ -692,9 +738,12 @@ interface Config {
 }
 
 interface Param {
+  code: string;
   name: string;
   type: TypesEnum | string;
   required?: boolean;
+  import?: string;
+  props?: Param[];
 }
 
 enum TypesEnum {
@@ -723,29 +772,27 @@ interface DataStructure {
     };
     content: {
       element: string;
-      meta: {
+      meta?: {
         description: string;
       };
       attributes?: {
         typeAttributes: string[];
       };
       content: {
-        key: {
+        key?: {
           element: string;
           attributes: any;
           content: string;
         };
-        value: {
+        value?: {
           element: string;
           attributes: any;
           content: string;
         };
+        href?: string;
+        path?: string;
       }
     }[]
   }[];
 }
 
-interface Structure {
-  code: string;
-  name: string;
-}
