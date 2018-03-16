@@ -90,7 +90,7 @@ function getResourceGroup(content) {
   const dataStructures: any[] = getDataStructures(content);
 
   // CREATE GLOBAL TYPES
-  const structures: Structure[] = createTypes(dataStructures);
+  const structures: Structure[] = getTypes(dataStructures);
 
   // CREATE TYPE FILES
   createTypeFiles(structures, config);
@@ -130,7 +130,7 @@ function getResourceGroup(content) {
       result3.values.forEach((node) => {
 
         const unitName: string = camelCase(getTitle(node));
-        console.log(unitName);
+        console.log(JSON.stringify(node));
 
         const url = getHref(node) || getHref(subGroup);
         const urlWithoutQueryParams: string = prepareHref(url);
@@ -333,21 +333,26 @@ function getPropertyName(node: any): string {
   return node && node.content && node.content.key && node.content.key.content ? node.content.key.content : '';
 }
 
-function getPropertyType(node: any, structures: Structure[]): string {
-  // TODO: find structures
-  return node && node.content && node.content.value && node.content.value.element ? node.content.value.element : '';
+function getPropertyType(node: any): string {
+  const type: string = node && node.content && node.content.value && node.content.value.element ? node.content.value.element : '';
+  // const structureType: string = getTypeName(type, structures);
+  return type;
 }
 
 function getPropertyRequired(node: any): boolean {
   return node && node.attributes && node.attributes.typeAttributes && node.attributes.typeAttributes.indexOf(REQUIRED) > -1;
 }
 
+function getTypeName(value: string, structures: Structure[]): string {
+  const type: Structure = structures.filter(item => item.code === value)[0];
+  return type ? type.name : value;
+}
+
 function getDataStructures(content: any): DataStructure[] {
-  // TODO: impl
   const resultDataStructures: Result = {values: []};
   const result: Structure[] = [];
   recurse(content, [{name: 'element', value: CATEGORY}], DATA_STRUCTURES, resultDataStructures);
-  console.log(JSON.stringify(resultDataStructures));
+  // console.log(JSON.stringify(resultDataStructures));
 
   if (resultDataStructures.values[0]) {
     const types: DataStructure[] = resultDataStructures.values[0].content;
@@ -426,7 +431,7 @@ function getHrefVariables(node: any, structures: Structure[]): Param[] {
     hrefVariables.values[0].content.forEach((hrefVariable) => {
       variables.push({
         name: getPropertyName(hrefVariable),
-        type: getPropertyType(hrefVariable, structures),
+        type: getPropertyType(hrefVariable),
         required: getPropertyRequired(hrefVariable)
       });
     });
@@ -435,7 +440,7 @@ function getHrefVariables(node: any, structures: Structure[]): Param[] {
   return variables;
 }
 
-function getBodyVariables(node: any): Param[] {
+function getBodyVariables(node: any, structures: Structure[]): Param[] {
   const httpRequest: Result = {values: []};
   const dataStructure: Result = {values: []};
   const variables: any[] = [];
@@ -455,20 +460,28 @@ function getBodyVariables(node: any): Param[] {
   return variables || [];
 }
 
-function getResponseVariables(node: any): Param[] {
+function getResponseVariables(node: any, structures: Structure[]): Param[] {
   const httpResponse: Result = {values: []};
   const dataStructure: Result = {values: []};
-  const variables: any[] = [];
+  const variables: Param[] = [];
   recurse(node, [{name: 'element', value: HTTP_RESPONSE}], null, httpResponse);
   recurse(httpResponse, [{name: 'element', value: DATA_STRUCTURE}], null, dataStructure);
 
   if (dataStructure.values[0] && dataStructure.values[0].content && dataStructure.values[0].content[0]) {
     dataStructure.values[0].content[0].content.forEach((variable) => {
-      variables.push({
-        name: getPropertyName(variable),
-        type: getPropertyType(variable),
-        required: getPropertyRequired(variable)
-      });
+      // FIND REF TYPE
+      // TODO:
+      const type: string = getPropertyType(variable);
+      const refType = getType(type);
+      if (refType) {
+        variables.push(refType);
+      } else {
+        variables.push({
+          name: getPropertyName(variable),
+          type: type,
+          required: getPropertyRequired(variable)
+        });
+      }
     });
   }
 
@@ -541,17 +554,19 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
   }
 }
 
-function createTypes(ds: DataStructure[]): Structure[] {
+function getTypes(ds: DataStructure[]): Structure[] {
   const result: Structure[] = [];
   ds.forEach((data) => {
-    result.push(createType(data));
+    result.push(getType(data));
   });
   return result;
 }
 
-function createType(value: DataStructure): Structure {
-  // TODO: implementation
-  const result: Structure = null;
+function getType(type: string, structure: DataStructure): Structure {
+  const result: Structure = {
+    code: structure.content[0].meta.id.content,
+    name: firstUp(camelCase(structure.content[0].meta.id.content))
+  };
   return result;
 }
 
@@ -678,7 +693,7 @@ interface Config {
 
 interface Param {
   name: string;
-  type: TypesEnum;
+  type: TypesEnum | string;
   required?: boolean;
 }
 
@@ -733,5 +748,4 @@ interface DataStructure {
 interface Structure {
   code: string;
   name: string;
-  type: string;
 }
