@@ -580,16 +580,17 @@ function getTypes(ds: DataStructure[]): Param[] {
           const codeProp: string = item.content.href;
           props.push({
             code: codeProp,
-            type: firstUp(camelCase(codeProp)),
+            type: codeProp,
             name: firstUp(camelCase(codeProp)),
           });
         } else if (item.element === MEMBER) {
           console.log(JSON.stringify(item));
           const codeProp: string = item.content.key.content;
+          const typeProp: string = item.content.value.element;
           props.push({
             code: codeProp,
-            type: firstUp(camelCase(codeProp)),
-            name: firstUp(camelCase(codeProp)),
+            type: typeProp,
+            name: codeProp,
           });
         }
       });
