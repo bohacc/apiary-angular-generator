@@ -11,6 +11,7 @@ const META = 'meta';
 const REFERENCE = 'ref';
 const MEMBER = 'member';
 const OBJECT = 'object';
+const ENUM = 'enum';
 const HTTP_REQUEST = 'httpRequest';
 const HTTP_RESPONSE = 'httpResponse';
 const HREF_VARIABLES = 'hrefVariables';
@@ -569,14 +570,15 @@ function getTypes(ds: DataStructure[]): Param[] {
     // PROPERTIES
     if (data.content && data.content[0] && data.content[0].content && data.content[0].content.length) {
       data.content[0].content.forEach((item) => {
+        // REFERENCE
         if (item.element === REFERENCE) {
-          // TODO: find type
           const codeProp: string = item.content.href;
           props.push({
             code: codeProp,
             type: codeProp,
             name: firstUp(camelCase(codeProp)),
           });
+          // MEMBER
         } else if (item.element === MEMBER) {
           if (item.content.value.element === OBJECT) {
             const propsMember: Param[] = [];
@@ -609,9 +611,23 @@ function getTypes(ds: DataStructure[]): Param[] {
               name: codeProp,
             });
           }
+          // ENUM
+        } else if (item.element === ENUM) {
+          if (item.content && item.content.length) {
+            console.log(JSON.stringify(item));
+            const codeProp: string = item.content.key.content;
+            const typeProp: string = item.content.value.element;
+            props.push({
+              code: codeProp,
+              type: typeProp,
+              name: codeProp,
+              description:
+            });
+          }
         }
       });
     }
+
     result.push({
       code: code,
       type: firstUp(camelCase(code)),
