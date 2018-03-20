@@ -10,6 +10,7 @@ const CATEGORY = 'category';
 const META = 'meta';
 const REFERENCE = 'ref';
 const MEMBER = 'member';
+const OBJECT = 'object';
 const HTTP_REQUEST = 'httpRequest';
 const HTTP_RESPONSE = 'httpResponse';
 const HREF_VARIABLES = 'hrefVariables';
@@ -58,7 +59,7 @@ function recurse(content: any, nodes: Node[], meta: string, result: Result) {
       recurse(item, nodes, meta, result);
     });
   } else {
-    if (typeof content === 'object' && content !== null) {
+    if (typeof content === OBJECT && content !== null) {
       if (existNodes(content, nodes) &&
         ((meta && content[META] && content[META][CLASSES] && content[META][CLASSES][0] === meta) || !meta)
       ) {
@@ -563,14 +564,7 @@ function createTypeResponse(config: Config, unitName: string, groupName: string,
 function getTypes(ds: DataStructure[]): Param[] {
   const result: Param[] = [];
   ds.forEach((data) => {
-    /*console.log('data');
-    console.log(JSON.stringify(data.content[0].meta.id.content));
-    console.log('/data');*/
-
     const props: Param[] = [];
-    /*const required: boolean = data.content[0] && data.content[0].content && data.content[0].content[0] &&
-      data.content[0].content[0].attributes && data.content[0].content[0].attributes.typeAttributes ?
-        data.content[0].content[0].attributes.typeAttributes.indexOf(REQUIRED) > -1 : false;*/
     const code = data.content[0] && data.content[0].meta && data.content[0].meta.id ? data.content[0].meta.id.content : null;
     // PROPERTIES
     if (data.content && data.content[0] && data.content[0].content && data.content[0].content.length) {
@@ -584,14 +578,37 @@ function getTypes(ds: DataStructure[]): Param[] {
             name: firstUp(camelCase(codeProp)),
           });
         } else if (item.element === MEMBER) {
-          console.log(JSON.stringify(item));
-          const codeProp: string = item.content.key.content;
-          const typeProp: string = item.content.value.element;
-          props.push({
-            code: codeProp,
-            type: typeProp,
-            name: codeProp,
-          });
+          if (item.content.value.element === OBJECT) {
+            const propsMember: Param[] = [];
+            if (item.content.value && item.content.value.content && item.content.value.content.length) {
+              item.content.value.content.forEach((itemMember) => {
+                const codePropMember: string = itemMember.content.key.content;
+                const typePropMember: string = itemMember.content.value.element;
+                propsMember.push({
+                  code: codePropMember,
+                  type: typePropMember,
+                  name: codePropMember
+                });
+              });
+            }
+            const codeProp: string = item.content.key.content;
+            const typeProp: string = item.content.value.element;
+            props.push({
+              code: codeProp,
+              type: typeProp,
+              name: codeProp,
+              props: propsMember
+            });
+          } else {
+            console.log(JSON.stringify(item));
+            const codeProp: string = item.content.key.content;
+            const typeProp: string = item.content.value.element;
+            props.push({
+              code: codeProp,
+              type: typeProp,
+              name: codeProp,
+            });
+          }
         }
       });
     }
@@ -788,7 +805,7 @@ interface DataStructure {
         value?: {
           element: string;
           attributes: any;
-          content: string;
+          content: any | any[];
         };
         href?: string;
         path?: string;
