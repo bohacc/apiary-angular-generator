@@ -569,63 +569,100 @@ function getTypes(ds: DataStructure[]): Param[] {
     const code = data.content[0] && data.content[0].meta && data.content[0].meta.id ? data.content[0].meta.id.content : null;
     // PROPERTIES
     if (data.content && data.content[0] && data.content[0].content && data.content[0].content.length) {
-      data.content[0].content.forEach((item) => {
-        // REFERENCE
-        if (item.element === REFERENCE) {
-          const codeProp: string = item.content.href;
-          props.push({
-            code: codeProp,
-            type: codeProp,
-            name: firstUp(camelCase(codeProp)),
-          });
-          // MEMBER
-        } else if (item.element === MEMBER) {
-          if (item.content.value.element === OBJECT) {
-            const propsMember: Param[] = [];
-            if (item.content.value && item.content.value.content && item.content.value.content.length) {
-              item.content.value.content.forEach((itemMember) => {
-                const codePropMember: string = itemMember.content.key.content;
-                const typePropMember: string = itemMember.content.value.element;
-                propsMember.push({
-                  code: codePropMember,
-                  type: typePropMember,
-                  name: codePropMember
+
+      // MEMBER, REFERENCE
+      if (data.content[0].element === OBJECT) {
+
+        data.content[0].content.forEach((item) => {
+
+          // REFERENCE
+          if (item.element === REFERENCE) {
+
+            const codeProp: string = item.content.href;
+            props.push({
+              code: codeProp,
+              type: codeProp,
+              name: firstUp(camelCase(codeProp)),
+            });
+
+            // MEMBER
+          } else if (item.element === MEMBER) {
+
+            if (item.content.value.element === OBJECT) {
+              const propsMember: Param[] = [];
+              if (item.content.value && item.content.value.content && item.content.value.content.length) {
+                item.content.value.content.forEach((itemMember) => {
+                  const codePropMember: string = itemMember.content.key.content;
+                  const typePropMember: string = itemMember.content.value.element;
+                  propsMember.push({
+                    code: codePropMember,
+                    type: typePropMember,
+                    name: codePropMember
+                  });
                 });
+              }
+              const codeProp: string = item.content.key.content;
+              const typeProp: string = item.content.value.element;
+              props.push({
+                code: codeProp,
+                type: typeProp,
+                name: codeProp,
+                props: propsMember
+              });
+            } else if (item.content.value.element === ENUM) {
+              const propsMember: Param[] = [];
+              if (item.content.value && item.content.value.content && item.content.value.content.length) {
+                item.content.value.content.forEach((itemMember) => {
+                  const codePropMember: string = itemMember.content;
+                  const typePropMember: string = itemMember.content;
+                  propsMember.push({
+                    code: codePropMember,
+                    type: typePropMember,
+                    name: codePropMember
+                  });
+                });
+              }
+              console.log(JSON.stringify(item));
+              const codeProp: string = item.content.key.content;
+              const typeProp: string = item.content.value.element;
+              props.push({
+                code: codeProp,
+                type: typeProp,
+                name: codeProp,
+                props: propsMember
+              });
+            } else {
+              console.log(JSON.stringify(item));
+              const codeProp: string = item.content.key.content;
+              const typeProp: string = item.content.value.element;
+              props.push({
+                code: codeProp,
+                type: typeProp,
+                name: codeProp,
               });
             }
-            const codeProp: string = item.content.key.content;
-            const typeProp: string = item.content.value.element;
-            props.push({
-              code: codeProp,
-              type: typeProp,
-              name: codeProp,
-              props: propsMember
-            });
-          } else {
-            console.log(JSON.stringify(item));
-            const codeProp: string = item.content.key.content;
-            const typeProp: string = item.content.value.element;
-            props.push({
-              code: codeProp,
-              type: typeProp,
-              name: codeProp,
-            });
+
           }
-          // ENUM
-        } else if (item.element === ENUM) {
+        });
+      }
+
+      // MEMBER, REFERENCE
+      if (data.content[0].element === ENUM) {
+        // ENUM
+        data.content[0].content.forEach((item) => {
           if (item.content && item.content.length) {
             console.log(JSON.stringify(item));
-            const codeProp: string = item.content.key.content;
-            const typeProp: string = item.content.value.element;
+            const codeProp: string = item.content;
+            const typeProp: string = item.content;
             props.push({
               code: codeProp,
               type: typeProp,
               name: codeProp,
-              description:
+              description: item.meta.description.content
             });
           }
-        }
-      });
+        });
+      }
     }
 
     result.push({
@@ -778,6 +815,7 @@ interface Param {
   required?: boolean;
   import?: string;
   props?: Param[];
+  description?: string;
 }
 
 enum TypesEnum {
@@ -792,41 +830,44 @@ interface DataStructure {
   element: string;
   content: {
     element: string;
-    meta: {
-      id: {
-        element: string;
-        attributes: any;
-        content: string;
-      };
-      decription?: {
-        element: string;
-        attributes: any;
-        content: string;
-      }
-    };
-    content: {
-      element: string;
-      meta?: {
-        description: string;
-      };
-      attributes?: {
-        typeAttributes: string[];
-      };
-      content: {
-        key?: {
-          element: string;
-          attributes: any;
-          content: string;
-        };
-        value?: {
-          element: string;
-          attributes: any;
-          content: any | any[];
-        };
-        href?: string;
-        path?: string;
-      }
-    }[]
+    meta: Meta;
+    content: NodeItem[]
   }[];
 }
 
+interface Meta {
+  id?: {
+    element: string;
+    attributes: any;
+    content: string;
+  };
+  description?: {
+    element: string;
+    attributes: any;
+    content: string;
+  };
+}
+
+interface NodeItem {
+  element: string;
+  meta?: Meta;
+  attributes?: {
+    typeAttributes: string[];
+  };
+  content: NodeContent | NodeContent[] | any;
+}
+
+interface NodeContent {
+  key?: {
+    element: string;
+    attributes: any;
+    content: string;
+  };
+  value?: {
+    element: string;
+    attributes: any;
+    content: any | any[];
+  };
+  href?: string;
+  path?: string;
+}
